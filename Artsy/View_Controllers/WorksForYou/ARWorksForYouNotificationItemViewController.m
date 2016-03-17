@@ -18,6 +18,7 @@
 @interface ARWorksForYouNotificationItemViewController () <AREmbeddedModelsViewControllerDelegate, ARArtworkMasonryLayoutProvider>
 @property (nonatomic, strong) ARWorksForYouNotificationItem *notificationItem;
 @property (nonatomic, strong) AREmbeddedModelsViewController *artworksVC;
+@property (nonatomic, strong) ARArtworkWithMetadataThumbnailCell *singleArtworkView;
 @property (nonatomic, strong) ORStackView *view;
 @end
 
@@ -75,16 +76,14 @@
     [self.view addSubview:numberOfWorksAddedLabel withTopMargin:@"7" sideMargin:labelSideMargin];
 
     if (self.notificationItem.artworks.count == 1) {
-        ARArtworkWithMetadataThumbnailCell *singleCell = [[ARArtworkWithMetadataThumbnailCell alloc] init];
-        singleCell.imageSize = ARFeedItemImageSizeLarge;
-        [singleCell setupWithRepresentedObject:self.notificationItem.artworks.firstObject];
-        NSString *maxHeight = [NSString stringWithFormat:@"%f", [UIScreen mainScreen].bounds.size.height - 200];
+        self.singleArtworkView = self.singleArtworkView ?: [[ARArtworkWithMetadataThumbnailCell alloc] init];
+        self.singleArtworkView.imageSize = ARFeedItemImageSizeLarge;
+        self.singleArtworkView.imageViewContentMode = UIViewContentModeScaleAspectFit;
+        [self.singleArtworkView setupWithRepresentedObject:self.notificationItem.artworks.firstObject];
 
-        [singleCell constrainHeight:maxHeight];
+        [self.singleArtworkView addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(singleArtworkTapped:)]];
 
-        [singleCell addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(singleArtworkTapped:)]];
-
-        [self.view addSubview:singleCell withTopMargin:@"7" sideMargin:@"75"];
+        [self.view addSubview:self.singleArtworkView withTopMargin:@"10" sideMargin:@"75"];
 
     } else {
         self.artworksVC = self.artworksVC ?: [[AREmbeddedModelsViewController alloc] init];
@@ -97,8 +96,28 @@
         self.artworksVC.activeModule = module;
         [self.artworksVC appendItems:self.notificationItem.artworks];
         [self.view addViewController:self.artworksVC toParent:self withTopMargin:@"0" sideMargin:@"0"];
+    }
+}
+
+- (void)didMoveToParentViewController:(UIViewController *)parent
+{
+    [super didMoveToParentViewController:parent];
+
+    if (self.artworksVC) {
         // this tells the embedded artworks view controller that it should update for the correct size because self.view.frame.size at this point is (0, 0)
-        [self.artworksVC didMoveToParentViewController:self.parentViewController];
+        [self.artworksVC didMoveToParentViewController:parent];
+    } else if (self.singleArtworkView) {
+        Artwork *artwork = self.notificationItem.artworks.firstObject;
+
+        // height of parent view minus margins and artist, date, and numberOfWorks labels
+        CGFloat maxHeight = parent.view.frame.size.height - 200;
+
+        CGFloat viewHeight = (artwork.aspectRatio > 1) ? (maxHeight / artwork.aspectRatio) : maxHeight;
+
+        viewHeight += [ARArtworkWithMetadataThumbnailCell heightForMetadataWithArtwork:artwork];
+
+        [self.singleArtworkView constrainHeight:[NSString stringWithFormat:@"%f", viewHeight]];
+        [self.singleArtworkView alignBottomEdgeWithView:self.view predicate:@"20"];
     }
 }
 
